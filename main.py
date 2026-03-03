@@ -8,6 +8,7 @@ from ui.selection_window import SelectionWindow
 from ui.region_overlay import RegionOverlay
 from core.ai_provider import GeminiProvider
 from core.scanner import ScreenScanner
+from core.memory_manager import MemoryManager
 
 load_dotenv()  # 讀取 .env 中的 GEMINI_API_KEY
 
@@ -17,6 +18,7 @@ main_win = None
 selection_win = None
 scanner = None
 region_overlay = None   # 螢幕上的藍色框線
+memory_manager = None   # 工作記憶
 
 
 def start_selection():
@@ -29,8 +31,8 @@ def start_selection():
 
 
 def on_region_selected(region):
-    """使用者完成選取後，顯示框線、初始化 AI、啟動掃描。"""
-    global scanner, region_overlay
+    """使用者完成選取後，顯示框線、初始化 AI 與記憶、啟動掃描。"""
+    global scanner, region_overlay, memory_manager
 
     # 更新螢幕上的區域框線
     if region_overlay is not None:
@@ -53,9 +55,20 @@ def on_region_selected(region):
         main_win._on_stop_clicked()
         return
 
+    # 重置工作記憶（每次重新框選都清空舊記憶）
+    if memory_manager is None:
+        memory_manager = MemoryManager(max_window=8)
+    else:
+        memory_manager.reset()
+
     main_win.set_scanning(region)
 
-    scanner = ScreenScanner(region=region, ai_provider=ai_provider, interval=2.0)
+    scanner = ScreenScanner(
+        region=region,
+        ai_provider=ai_provider,
+        memory_manager=memory_manager,
+        interval=2.0,
+    )
     scanner.replies_ready.connect(main_win.update_replies)
     scanner.status_update.connect(main_win.set_status)
     scanner.start()
@@ -79,7 +92,7 @@ def on_stop_scanner():
 
 def main():
     global app, main_win
-    print("啟動 AI Chat Assistant (Gemini Vision 模式)...")
+    print("啟動 AI Chat Assistant (Gemini Vision + 工作記憶模式)...")
     app = QApplication(sys.argv)
 
     main_win = MainWindow()

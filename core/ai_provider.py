@@ -1,8 +1,7 @@
 import json
 import io
-import base64
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 from PIL import Image
 
 try:
@@ -16,41 +15,88 @@ except ImportError:
 
 class BaseAIProvider(ABC):
     @abstractmethod
-    def analyze_chat_image(self, image: Image.Image) -> List[str]:
+    def analyze_chat_image(self, image: Image.Image, context: str = "") -> List[str]:
         """
-        接收對話視窗截圖，回傳 3 種回覆建議字串列表。
+        接收對話視窗截圖與對話背景，回傳 3 種回覆建議字串列表。
         """
         raise NotImplementedError
 
-# ────────────────────── Gemini 實作 ──────────────────────
+    @abstractmethod
+    def extract_all_messages(self, image: Image.Image) -> List[str]:
+        """首次截圖：提取畫面中所有對話訊息，由舊到新排列。"""
+        raise NotImplementedError
 
-SYSTEM_PROMPT = """\
+    @abstractmethod
+    def extract_latest_message(self, image: Image.Image) -> str:
+        """後續截圖：只提取畫面中最後一則（最新）訊息。"""
+        raise NotImplementedError
+
+
+# ────────────────────── Prompts ──────────────────────
+
+# 全量提取：首次框選時使用，擷取畫面中所有訊息
+EXTRACT_ALL_PROMPT = """\
+這是一張 LINE 聊天視窗的截圖。請依照以下步驟處理：
+
+步驟一：從截圖頂端開始，由上到下掃描，數出畫面中總共有幾個訊息泡泡（含貼圖）。
+
+步驟二：按照由上到下的順序，將每一個泡泡逐一轉換成文字：
+- 靠左的泡泡（白色/灰色底，對方頭像在左側）→ 格式：「對方：文字內容」
+- 靠右的泡泡（綠色底，靠右對齊）→ 格式：「我：文字內容」
+- 貼圖、表情包、圖片 → 格式：「對方：[貼圖]」或「我：[貼圖]」
+- 每一個泡泡都必須輸出，不論多短（包含「ok」、「喔」等單字）
+
+步驟三：以 JSON 格式輸出，messages 陣列的長度必須等於步驟一數到的數量。
+
+只輸出 JSON，不要輸出步驟一和步驟二的思考過程：
+{"messages": ["對方：你好嗎", "我：還不錯", "對方：[貼圖]", "我：ok"]}
+"""
+
+# 增量提取：後續截圖時使用，只需要最新一則
+EXTRACT_LATEST_PROMPT = """\
+請看這張聊天視窗截圖，找出畫面中最下方（最新）的那一則訊息。
+
+規則：
+- 靠左的訊息（白色底）= 對方說的，格式為「對方：訊息內容」
+- 靠右的訊息（綠色底）= 我說的，格式為「我：訊息內容」
+
+嚴格以 JSON 格式回覆，不要有任何額外文字：
+{"latest": "對方：那明天見！"}
+"""
+
+# 回覆建議生成：帶入對話背景 context 後使用
+SUGGEST_SYSTEM_PROMPT = """\
 你是一位貼心的社交助手，專門幫助使用者回覆通訊軟體（如 LINE、Telegram）的訊息。
 
 我會傳給你一張聊天視窗的截圖。截圖中：
 - 靠左的訊息泡泡（通常是白色底）是【對方】說的話
-- 靠右的訊息泡泡（通常是綠色底或帶有「已讀」標示）是【我】說的話
+- 靠右的訊息泡泡（通常是綠色底）是【我】說的話
 
-請根據最新的對話內容，生成 3 種不同風格的繁體中文回覆建議：
+{context_section}
+
+請根據以上背景與截圖中最新的對話內容，生成 3 種不同風格的繁體中文回覆建議：
 1. 「正式」—有禮貌、措辭得體
 2. 「輕鬆」—幽默、友善、口語化
 3. 「簡短」—一句話、直接有力
 
 嚴格以 JSON 格式回覆，不要有任何額外文字或 markdown 代碼區塊：
-{"formal": "...", "casual": "...", "brief": "..."}
+{{"formal": "...", "casual": "...", "brief": "..."}}
 """
 
+
+# ────────────────────── Gemini 實作 ──────────────────────
+
 class GeminiProvider(BaseAIProvider):
-    def __init__(self, api_key: str, model: str = "gemini-flash-lite-latest"):
+    # 送圖前壓縮設定
+    # Gemini 圖片 Token 量正比於解析度（tiles），縮小可節省大量 Token
+    MAX_EDGE = 1024     # 長邊上限（px）；1024 在 Token 與文字辨識清晰度間取得較佳平衡
+    JPEG_QUALITY = 85   # JPEG 品質（80-90 為文字辨識的最佳平衡點）
+
+    def __init__(self, api_key: str, model: str = "gemini-flash-latest"):
         if not GENAI_AVAILABLE:
             raise ImportError("請執行 `uv add google-genai` 安裝 Gemini SDK")
         self.client = genai.Client(api_key=api_key)
         self.model = model
-
-    # 送圖前壓縮設定
-    # Gemini 圖片 Token 量正比於解析度（tiles），縮小可節省大量 Token
-    MAX_EDGE = 768      # 長邊上限（px）；可依需求調高，但 768 已足夠閱讀文字
-    JPEG_QUALITY = 85   # JPEG 品質（80-90 為文字辨識的最佳平衡點）
 
     def _image_to_bytes(self, image: Image.Image) -> bytes:
         """
@@ -70,20 +116,15 @@ class GeminiProvider(BaseAIProvider):
         print(f"[圖片大小] {w}×{h} → {image.width}×{image.height}  {len(compressed)//1024} KB")
         return compressed
 
-
-    def analyze_chat_image(self, image: Image.Image) -> List[str]:
-        """
-        傳送圖像給 Gemini，解析回傳的 JSON 並取得三種回覆建議。
-        透過 response_mime_type 強制模型回傳 JSON，提高穩定性。
-        """
+    def _call_gemini(self, image: Image.Image, prompt: str) -> str:
+        """共用的 Gemini API 呼叫，回傳清理後的原始文字。"""
         img_bytes = self._image_to_bytes(image)
-
         try:
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=[
                     types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"),
-                    SYSTEM_PROMPT,
+                    prompt,
                 ],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -93,7 +134,7 @@ class GeminiProvider(BaseAIProvider):
             raise RuntimeError(f"Gemini API 呼叫失敗：{e}") from e
 
         raw = (response.text or "").strip()
-        print(f"[Gemini 原始回覆] {raw[:200]}")  # 除錯用
+        print(f"[Gemini 回覆] {raw[:200]}")
 
         if not raw:
             raise ValueError("Gemini 回傳了空回覆。請確認模型名稱與 API Key 是否正確。")
@@ -104,7 +145,48 @@ class GeminiProvider(BaseAIProvider):
             raw = parts[1] if len(parts) > 1 else raw
             if raw.lower().startswith("json"):
                 raw = raw[4:]
-        raw = raw.strip()
+        return raw.strip()
+
+    # ──────────── 提取方法（記憶系統用）────────────
+
+    def extract_all_messages(self, image: Image.Image) -> List[str]:
+        """首次截圖全量提取：回傳所有訊息字串列表。"""
+        raw = self._call_gemini(image, EXTRACT_ALL_PROMPT)
+        try:
+            data = json.loads(raw)
+            messages = data.get("messages", [])
+            print(f"[全量提取] 共 {len(messages)} 則訊息")
+            return [m for m in messages if isinstance(m, str) and m.strip()]
+        except json.JSONDecodeError as e:
+            print(f"[全量提取] JSON 解析失敗：{e}，回傳空列表")
+            return []
+
+    def extract_latest_message(self, image: Image.Image) -> str:
+        """後續截圖增量提取：只回傳最新一則訊息字串。"""
+        raw = self._call_gemini(image, EXTRACT_LATEST_PROMPT)
+        try:
+            data = json.loads(raw)
+            latest = data.get("latest", "")
+            print(f"[增量提取] 最新訊息：{latest[:60]}")
+            return latest if isinstance(latest, str) else ""
+        except json.JSONDecodeError as e:
+            print(f"[增量提取] JSON 解析失敗：{e}，回傳空字串")
+            return ""
+
+    # ──────────── 建議生成方法 ────────────
+
+    def analyze_chat_image(self, image: Image.Image, context: str = "") -> List[str]:
+        """
+        傳送圖像（加上對話背景 context）給 Gemini，回傳 3 種回覆建議。
+        context 由 MemoryManager.get_context_prompt() 提供。
+        """
+        if context:
+            context_section = context
+        else:
+            context_section = "（無對話背景記錄）"
+
+        prompt = SUGGEST_SYSTEM_PROMPT.format(context_section=context_section)
+        raw = self._call_gemini(image, prompt)
 
         try:
             data = json.loads(raw)
@@ -116,4 +198,3 @@ class GeminiProvider(BaseAIProvider):
             data.get("casual", "（無輕鬆回覆）"),
             data.get("brief",  "（無簡短回覆）"),
         ]
-
