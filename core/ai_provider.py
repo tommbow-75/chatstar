@@ -116,13 +116,6 @@ class GeminiProvider(BaseAIProvider):
         image.convert("RGB").save(buf, format="JPEG", quality=self.JPEG_QUALITY, optimize=True)
         compressed = buf.getvalue()
         print(f"[圖片大小] {w}×{h} → {image.width}×{image.height}  {len(compressed)//1024} KB")
-
-        # ── 除錯：儲存實際送給 Gemini 的圖片 ──
-        import os, pathlib
-        debug_path = pathlib.Path(__file__).parent.parent / "debug_capture.jpg"
-        image.convert("RGB").save(debug_path, format="JPEG", quality=self.JPEG_QUALITY)
-        print(f"[除錯圖片] 已儲存至：{debug_path}")
-
         return compressed
 
 
