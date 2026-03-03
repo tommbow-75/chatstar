@@ -4,4 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "google-genai>=1.65.0",
+    "mss>=10.1.0",
+    "pillow>=12.1.1",
+    "pyperclip>=1.11.0",
+    "pyqt6>=6.10.2",
+    "pytesseract>=0.3.13",
+    "python-dotenv>=1.2.2",
+]
