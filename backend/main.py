@@ -4,21 +4,28 @@ from backend import models
 
 from backend.routers import users, buddies, chats, topics
 
-# 建立所有的資料表
+# 根據 models.py 中定義的所有 ORM Model，在資料庫中自動建立對應的資料表
+# 若資料表已存在則不會重建（不會刪除舊資料）
 models.Base.metadata.create_all(bind=engine)
 
+# 建立 FastAPI 應用程式實例，設定 API 文件標題、描述與版本號
 app = FastAPI(
     title="ChatStar Backend API",
     description="Backend service for ChatStar AI Assistant using PostgreSQL",
     version="1.0.0"
 )
 
-# 註冊所有的 API 路由
-app.include_router(users.router)
-app.include_router(buddies.router)
-app.include_router(chats.router)
-app.include_router(topics.router)
+# 將各功能模組的路由（router）掛載至主應用程式
+# 每個 router 負責一個資源類別的 API endpoint
+app.include_router(users.router)    # 使用者相關 API
+app.include_router(buddies.router)  # AI 好友相關 API
+app.include_router(chats.router)    # 對話記錄相關 API
+app.include_router(topics.router)   # 話題記錄相關 API
 
 @app.get("/")
 def read_root():
+    """
+    根路徑健康檢查端點（Health Check）。
+    用於確認 API 伺服器是否正常運作，回傳歡迎訊息。
+    """
     return {"message": "Welcome to ChatStar API"}
