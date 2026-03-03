@@ -19,14 +19,19 @@ class RegionOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
-        border = 3  # 邊框留白
+        # ── 物理像素 → 邏輯像素（Qt 繪圖用邏輯像素）──
+        from PyQt6.QtWidgets import QApplication
+        dpr = QApplication.primaryScreen().devicePixelRatio()
+
+        border = 3  # 邊框留白（邏輯像素）
         self.setGeometry(
-            region["left"] - border,
-            region["top"] - border,
-            region["width"] + border * 2,
-            region["height"] + border * 2,
+            int(region["left"]   / dpr) - border,
+            int(region["top"]    / dpr) - border,
+            int(region["width"]  / dpr) + border * 2,
+            int(region["height"] / dpr) + border * 2,
         )
         self.show()
+
 
     def paintEvent(self, event):
         painter = QPainter(self)

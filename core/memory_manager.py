@@ -31,14 +31,16 @@ class MemoryManager:
     def add_messages(self, messages: list[str]) -> None:
         """
         全量填充（首次初始化用）。
-        清空舊 buffer 後依序加入所有訊息。
+        注意：EXTRACT_ALL_PROMPT 回傳「最新→最舊」順序，
+        此處自動 reverse 為「由舊到新」再存入 buffer。
         """
         self._buffer.clear()
-        for msg in messages:
+        for msg in reversed(messages):   # ← reverse 回正確時序
             if msg and msg.strip():
                 self._buffer.append(msg.strip())
         self.is_initialized = True
-        print(f"[MemoryManager] 全量初始化完成，共 {len(self._buffer)} 則訊息")
+        print(f"[MemoryManager] 全量初始化完成，共 {len(self._buffer)} 則，最新：{list(self._buffer)[-1][:40] if self._buffer else '(空)'}")
+
 
     def add_latest(self, message: str) -> bool:
         """

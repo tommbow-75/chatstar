@@ -73,18 +73,24 @@ class SelectionWindow(QWidget):
                 self.update()
                 return
             
-            # 取得視窗在螢幕上的偏移量
+            # ── DPI 換算：Qt 邏輯像素 → mss 物理像素 ──
+            # Windows 顯示縮放（如 125%、150%）會讓 Qt 座標與螢幕實際像素不一致
+            # mss 使用物理像素，所以必須乘以 devicePixelRatio
+            screen = QApplication.primaryScreen()
+            dpr = screen.devicePixelRatio()
+
             win_pos = self.pos()
             region = {
-                "top": rect.y() + win_pos.y(),
-                "left": rect.x() + win_pos.x(),
-                "width": rect.width(),
-                "height": rect.height()
+                "top":    int((rect.y() + win_pos.y()) * dpr),
+                "left":   int((rect.x() + win_pos.x()) * dpr),
+                "width":  int(rect.width()  * dpr),
+                "height": int(rect.height() * dpr),
             }
-            
-            print(f"選取完成: {region}")
+
+            print(f"選取完成 (DPR={dpr:.2f}): 邏輯={rect.width()}×{rect.height()}  物理={region['width']}×{region['height']}")
             self.region_selected.emit(region)
             self.close()
+
     
     def keyPressEvent(self, event):
         # 按 ESC 可以離開選取模式

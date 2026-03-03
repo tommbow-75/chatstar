@@ -35,22 +35,24 @@ class BaseAIProvider(ABC):
 # ────────────────────── Prompts ──────────────────────
 
 # 全量提取：首次框選時使用，擷取畫面中所有訊息
+# ⚠️ 由下往上提取：確保即使模型提早停止，最新訊息也已被記錄
 EXTRACT_ALL_PROMPT = """\
 這是一張 LINE 聊天視窗的截圖。請依照以下步驟處理：
 
-步驟一：從截圖頂端開始，由上到下掃描，數出畫面中總共有幾個訊息泡泡（含貼圖）。
+步驟一：定位畫面最下方（最新）的訊息泡泡作為起點。
 
-步驟二：按照由上到下的順序，將每一個泡泡逐一轉換成文字：
+步驟二：從最下方往上，逐一列出每一個訊息泡泡：
 - 靠左的泡泡（白色/灰色底，對方頭像在左側）→ 格式：「對方：文字內容」
 - 靠右的泡泡（綠色底，靠右對齊）→ 格式：「我：文字內容」
 - 貼圖、表情包、圖片 → 格式：「對方：[貼圖]」或「我：[貼圖]」
 - 每一個泡泡都必須輸出，不論多短（包含「ok」、「喔」等單字）
 
-步驟三：以 JSON 格式輸出，messages 陣列的長度必須等於步驟一數到的數量。
+步驟三：以 JSON 格式輸出，messages 陣列中第一個元素是最新訊息，最後一個是最舊訊息：
 
-只輸出 JSON，不要輸出步驟一和步驟二的思考過程：
-{"messages": ["對方：你好嗎", "我：還不錯", "對方：[貼圖]", "我：ok"]}
+只輸出 JSON，不要輸出思考過程：
+{"messages": ["我：我在裡面了", "我：ok", "對方：沒關係 我有車", "對方：你好嗎"]}
 """
+
 
 # 增量提取：後續截圖時使用，只需要最新一則
 EXTRACT_LATEST_PROMPT = """\
@@ -114,7 +116,15 @@ class GeminiProvider(BaseAIProvider):
         image.convert("RGB").save(buf, format="JPEG", quality=self.JPEG_QUALITY, optimize=True)
         compressed = buf.getvalue()
         print(f"[圖片大小] {w}×{h} → {image.width}×{image.height}  {len(compressed)//1024} KB")
+
+        # ── 除錯：儲存實際送給 Gemini 的圖片 ──
+        import os, pathlib
+        debug_path = pathlib.Path(__file__).parent.parent / "debug_capture.jpg"
+        image.convert("RGB").save(debug_path, format="JPEG", quality=self.JPEG_QUALITY)
+        print(f"[除錯圖片] 已儲存至：{debug_path}")
+
         return compressed
+
 
     def _call_gemini(self, image: Image.Image, prompt: str) -> str:
         """共用的 Gemini API 呼叫，回傳清理後的原始文字。"""
