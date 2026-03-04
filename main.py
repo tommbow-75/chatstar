@@ -191,6 +191,13 @@ def main():
     # ──────────────────────────────────────────────────
     main_win = MainWindow()
 
+    # 自動載入聊天對象選單
+    db = SessionLocal()
+    from backend.crud import get_buddies_by_user
+    buddies = get_buddies_by_user(db, current_user_id)
+    main_win.load_buddies(buddies)
+    db.close()
+
     # 自動從 .env 填入 Gemini API Key
     env_key = os.getenv("GEMINI_API_KEY", "")
     if env_key:
