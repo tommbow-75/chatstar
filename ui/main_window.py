@@ -7,6 +7,7 @@ from ui.reply_panel import ReplyPanel
 class MainWindow(QMainWindow):
     start_selection = pyqtSignal()
     stop_scanner = pyqtSignal()
+    open_data_manager = pyqtSignal()  # 開啟資料管理視窗
 
     def __init__(self):
         super().__init__()
@@ -122,6 +123,22 @@ class MainWindow(QMainWindow):
         # ── 回覆建議面板 ──
         self.reply_panel = ReplyPanel()
         layout.addWidget(self.reply_panel)
+
+        # ── 資料管理按鈕 ──
+        self.btn_data_manager = QPushButton("📊  資料管理")
+        self.btn_data_manager.setObjectName("btn_data_manager")
+        self.btn_data_manager.setStyleSheet("""
+            QPushButton#btn_data_manager {
+                background-color: #2a2a3e; color: #a0d8ef;
+                border: 1px solid #4a4a6e; border-radius: 8px;
+                font-size: 12px; padding: 7px 14px;
+            }
+            QPushButton#btn_data_manager:hover {
+                background-color: #3a3a5e; border-color: #89b4fa; color: white;
+            }
+        """)
+        self.btn_data_manager.clicked.connect(self.open_data_manager.emit)
+        layout.addWidget(self.btn_data_manager)
 
         # ── 底部提示 ──
         hint = QLabel("提示：選取後切換到通訊軟體，有新訊息時 AI 會自動分析。")

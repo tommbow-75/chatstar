@@ -7,7 +7,7 @@ from .database import Base
 class User(Base):
     """
     使用者資料表（users）。
-    儲存每位使用者的基本資料、個人偏好設定，以及個人 API 金鑰。
+    儲存使用者的基本資料與興趣偏好，供 AI 系統產生回覆建議時參考。
     """
     __tablename__ = "users"
 
@@ -16,23 +16,23 @@ class User(Base):
     preferences = Column(JSONB)                                   # 使用者偏好設定（JSON 格式）
 
     # ORM 關聯屬性（非資料庫欄位）：方便在 Python 中直接存取關聯資料
-    buddies = relationship("BuddyInfo", back_populates="user", cascade="all, delete-orphan")         # 該使用者的所有 AI 好友
+    buddies = relationship("BuddyInfo", back_populates="user", cascade="all, delete-orphan")         # 該使用者的所有聊天對象
     chat_logs = relationship("ChatLog", back_populates="user", cascade="all, delete-orphan")          # 該使用者的所有對話記錄
     user_topics = relationship("UserTopicLog", back_populates="user", cascade="all, delete-orphan")   # 該使用者的個人話題記錄
-    buddy_topics = relationship("BuddyTopicLog", back_populates="user", cascade="all, delete-orphan") # 該使用者與 AI 好友的話題記錄
+    buddy_topics = relationship("BuddyTopicLog", back_populates="user", cascade="all, delete-orphan") # 該使用者與聊天對象的話題記錄
 
 class BuddyInfo(Base):
     """
-    AI 好友設定資料表（buddy_info）。
-    儲存使用者所建立的各個 AI 好友角色設定與偏好參數。
-    每筆資料對應一個使用者（user_id）與一個 AI 好友名稱（dmbuddy）。
+    聊天對象資料表（buddy_info）。
+    儲存聊天對象的基本資料與興趣偏好，供 AI 系統產生更合適的回覆建議。
+    每筆資料對應一個使用者（user_id）與一個聊天對象名稱（dmbuddy）。
     """
     __tablename__ = "buddy_info"
 
     id = Column(Integer, primary_key=True, index=True)                                              # 自動遞增主鍵
-    user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)   # 所屬使用者（外鍵，使用者刪除時連帶刪除）
-    dmbuddy = Column(String(100), nullable=False)                                                    # AI 好友名稱（對應 IG DM 或聊天對象）
-    buddy_prefs = Column(JSONB)                                                                      # 該 AI 好友的個人化設定（JSON 格式）
+    user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)   # 所屬使用者（外鍵）
+    dmbuddy = Column(String(100), nullable=False)                                                    # 聊天對象名稱
+    interests = Column(JSONB)                                                                        # 聊天對象的興趣與特質（JSON 格式，供 AI 參考）
 
     user = relationship("User", back_populates="buddies")  # 反向關聯至 User
 

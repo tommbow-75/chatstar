@@ -23,6 +23,33 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.refresh(db_user)
     return db_user
 
+def update_user(db: Session, user_id: str, user_update: schemas.UserUpdate):
+    """
+    更新指定使用者的資料。
+    僅更新 user_update 中有展開的欄位（exclude_unset），支援部分更新。
+    """
+    db_user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if db_user is None:
+        return None
+    update_data = user_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def delete_user(db: Session, user_id: str):
+    """
+    刪除指定使用者。
+    因應用 CASCADE 刪除模式，關聯的 buddies/chat_logs 將一併被刪除。
+    """
+    db_user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if db_user is None:
+        return None
+    db.delete(db_user)
+    db.commit()
+    return db_user
+
 # -----------------
 # BuddyInfo CRUD
 # -----------------
@@ -43,6 +70,30 @@ def create_buddy(db: Session, buddy: schemas.BuddyInfoCreate):
     db.add(db_buddy)
     db.commit()
     db.refresh(db_buddy)
+    return db_buddy
+
+def update_buddy(db: Session, buddy_id: int, buddy_update: schemas.BuddyInfoUpdate):
+    """
+    更新指定 AI 好友的設定。
+    僅更新 buddy_update 中有展開的欄位（exclude_unset）。
+    """
+    db_buddy = db.query(models.BuddyInfo).filter(models.BuddyInfo.id == buddy_id).first()
+    if db_buddy is None:
+        return None
+    update_data = buddy_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_buddy, key, value)
+    db.commit()
+    db.refresh(db_buddy)
+    return db_buddy
+
+def delete_buddy(db: Session, buddy_id: int):
+    """\u522a\u9664\u6307\u5b9a AI \u597d\u53cb\u8a2d\u5b9a。"""
+    db_buddy = db.query(models.BuddyInfo).filter(models.BuddyInfo.id == buddy_id).first()
+    if db_buddy is None:
+        return None
+    db.delete(db_buddy)
+    db.commit()
     return db_buddy
 
 # -----------------

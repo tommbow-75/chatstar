@@ -38,3 +38,25 @@ def read_user(user_id: str, db: Session = Depends(get_db)):
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
+
+@router.put("/{user_id}", response_model=schemas.User)
+def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+    """
+    [PUT /users/{user_id}] 更新指定使用者的資料。
+    支援部分更新，若使用者不存在則回傳 404 錯誤。
+    """
+    db_user = crud.update_user(db, user_id=user_id, user_update=user_update)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+@router.delete("/{user_id}", response_model=schemas.User)
+def delete_user(user_id: str, db: Session = Depends(get_db)):
+    """
+    [DELETE /users/{user_id}] 刪除指定使用者及其所有關聯資料。
+    若使用者不存在則回傳 404 錯誤。
+    """
+    db_user = crud.delete_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
