@@ -6,16 +6,26 @@ from dotenv import load_dotenv
 # 從 .env 檔案載入環境變數
 load_dotenv()
 
-# 使用 PostgreSQL
-# 預設連線字串範例: postgresql://user:password@localhost:5432/dbname
-# 優先讀取環境變數 DATABASE_URL，若未設定則使用預設本地連線字串
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
+# 使用 PostgreSQL（支援 Neon 雲端 / 本地端）
+# DATABASE_URL 格式: postgresql://user:password@host:5432/dbname
+_raw_url = os.getenv(
+    "DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/chatstar"
 )
 
-# 建立 SQLAlchemy 資料庫引擎，負責管理資料庫連線
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# SQLAlchemy 需要 postgresql+psycopg2:// 作為 driver 前綴
+_url = _raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+# Neon 雲端須加 sslmode=require（若 URL 中尚未包含）
+_is_cloud = "localhost" not in _raw_url and "127.0.0.1" not in _raw_url
+if _is_cloud and "sslmode" not in _url:
+    _url += ("&" if "?" in _url else "?") + "sslmode=require"
+
+SQLALCHEMY_DATABASE_URL = _url
+
+# pool_pre_ping=True：每次取用連線前先 ping，避免 idle 後連線失效
+engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
+
 
 # 建立 Session 工廠，每次呼叫 SessionLocal() 會產生一個新的資料庫 Session
 # autocommit=False: 需手動 commit；autoflush=False: 不自動刷新至資料庫
