@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
+from datetime import datetime, timedelta
 
 # -----------------
 # User CRUD
@@ -142,7 +143,15 @@ def create_user_topic(db: Session, topic: schemas.UserTopicLogCreate):
 # BuddyTopicLog CRUD
 # -----------------
 def get_buddy_topics(db: Session, user_id: str, dmbuddy: str):
-    """查詢特定使用者與特定 AI 好友的共同話題記錄。"""
+    """查詢特定使用者與特定 AI 好友的共同話題記錄。在查詢前自動清除超過三個月（90天）的話題。"""
+    three_months_ago = datetime.now() - timedelta(days=90)
+    db.query(models.BuddyTopicLog).filter(
+        models.BuddyTopicLog.user_id == user_id,
+        models.BuddyTopicLog.dmbuddy == dmbuddy,
+        models.BuddyTopicLog.created_at < three_months_ago
+    ).delete(synchronize_session=False)
+    db.commit()
+
     return db.query(models.BuddyTopicLog).filter(
         models.BuddyTopicLog.user_id == user_id,
         models.BuddyTopicLog.dmbuddy == dmbuddy
