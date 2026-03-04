@@ -14,7 +14,6 @@ class User(Base):
     user_id = Column(String(50), primary_key=True, index=True)   # 使用者唯一識別碼（主鍵）
     username = Column(String(100), nullable=False)                # 使用者顯示名稱
     preferences = Column(JSONB)                                   # 使用者偏好設定（JSON 格式）
-    user_api = Column(String(255))                                # 使用者個人 API 金鑰
 
     # ORM 關聯屬性（非資料庫欄位）：方便在 Python 中直接存取關聯資料
     buddies = relationship("BuddyInfo", back_populates="user", cascade="all, delete-orphan")         # 該使用者的所有 AI 好友
