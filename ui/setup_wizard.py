@@ -127,7 +127,7 @@ QWidget#chips_container {{
 QFrame#divider {{
     background-color: #45475a;
 }}
-/* QWizard 內建導覽按鈕 */
+/* QWizard 內建導覽按鈕（Next / Finish） */
 QWizard QPushButton {{
     background-color: #89b4fa;
     color: #1e1e2e;
@@ -140,14 +140,7 @@ QWizard QPushButton {{
     min-width: 80px;
 }}
 QWizard QPushButton:hover  {{ background-color: #b4d0fa; }}
-QWizard QPushButton[text="< 上一步"],
-QWizard QPushButton[text="取消"] {{
-    background-color: transparent;
-    color: #a6adc8;
-    border: 1px solid #585b70;
-}}
-QWizard QPushButton[text="< 上一步"]:hover {{ color: #cdd6f4; border-color: #cdd6f4; }}
-QWizard QPushButton[text="取消"]:hover    {{ color: #f38ba8; border-color: #f38ba8; }}
+QWizard QPushButton:disabled {{ background-color: #45475a; color: #6c7086; }}
 """
 
 
@@ -433,15 +426,37 @@ class SetupWizard(QWizard):
         self.user_id = user_id
 
         self.setWindowTitle(f"ChatStar — 初始設置  (ID: {user_id})")
-        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
-        self.setFixedSize(580, 540)
+        # ClassicStyle 在 Windows 上導覽按鈕最穩定，避免 ModernStyle 的點擊事件問題
+        self.setWizardStyle(QWizard.WizardStyle.ClassicStyle)
+        self.setFixedSize(580, 560)
         self.setStyleSheet(_STYLE)
+
+        # 第一頁隱藏「上一步」按鈕（明確設定，確保行為一致）
+        self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
 
         # 按鈕文字中文化
         self.setButtonText(QWizard.WizardButton.NextButton,   "下一步 >")
         self.setButtonText(QWizard.WizardButton.BackButton,   "< 上一步")
         self.setButtonText(QWizard.WizardButton.FinishButton, "完成 ✓")
         self.setButtonText(QWizard.WizardButton.CancelButton, "取消")
+
+        # Next / Back / Finish：可執行時統一藍色（繼承 QWizard QPushButton 樣式）
+        # ─ disabled 狀態已由 stylesheet 中的 :disabled 規則處理（灰色）
+        # Cancel：保持灰框樣式（獨立設定）
+        cancel_style = (
+            "QPushButton {"
+            "background-color: transparent;"
+            "color: #a6adc8;"
+            "border: 1px solid #585b70;"
+            "border-radius: 7px;"
+            f"font-family: '{FONT_FAMILY}', '微軟正黑體', sans-serif;"
+            "font-size: 13px;"
+            "padding: 8px 20px;"
+            "min-width: 80px;"
+            "}"
+            "QPushButton:hover { color: #f38ba8; border-color: #f38ba8; }"
+        )
+        self.button(QWizard.WizardButton.CancelButton).setStyleSheet(cancel_style)
 
         self.page_basic    = PageBasicInfo(user_id)
         self.page_interest = PageInterests()
