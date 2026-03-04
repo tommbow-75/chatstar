@@ -107,11 +107,11 @@ def on_stop_scanner():
     _stop_scanner()
 
 
-def open_data_manager():
+def open_data_manager(user_id: str = ""):
     """開啟資料管理視窗（若已開啟則喚起到前景）。"""
     global data_manager_win
     if data_manager_win is None or not data_manager_win.isVisible():
-        data_manager_win = DataManagerWindow()
+        data_manager_win = DataManagerWindow(user_id=user_id)
         data_manager_win.show()
     else:
         data_manager_win.raise_()
@@ -199,7 +199,7 @@ def main():
 
     main_win.start_selection.connect(start_selection)
     main_win.stop_scanner.connect(on_stop_scanner)
-    main_win.open_data_manager.connect(open_data_manager)
+    main_win.open_data_manager.connect(lambda: open_data_manager(current_user_id))
     main_win.show()
 
     # 執行事件迴圈

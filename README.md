@@ -170,15 +170,3 @@ class MyOpenAIProvider(BaseAIProvider):
     def extract_latest_message(self, image) -> str:
         ...
 ```
-
----
-
-## 路線圖（Roadmap）
-
-- [x] 工作記憶（短期對話脈絡）
-- [x] 高 DPI / Windows 顯示縮放支援
-- [ ] 核心摘要（長對話自動濃縮）
-- [ ] 使用者偏好資料庫（長期記憶）
-- [ ] 懸浮球模式（最小化為螢幕邊緣小球）
-- [ ] 支援自訂 System Prompt / 人設
-- [ ] 切換不同 AI 模型的 UI 設定

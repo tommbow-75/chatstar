@@ -158,3 +158,28 @@ def create_buddy_topic(db: Session, topic: schemas.BuddyTopicLogCreate):
     db.commit()
     db.refresh(db_topic)
     return db_topic
+
+def delete_user_topic(db: Session, user_id: str, topic: str):
+    """刪除指定使用者的某一條個人話題記錄。"""
+    db_topic = db.query(models.UserTopicLog).filter(
+        models.UserTopicLog.user_id == user_id,
+        models.UserTopicLog.topic == topic
+    ).first()
+    if db_topic is None:
+        return None
+    db.delete(db_topic)
+    db.commit()
+    return db_topic
+
+def delete_buddy_topic(db: Session, user_id: str, dmbuddy: str, topic: str):
+    """刪除指定使用者與特定聊天對象的某一條話題記錄。"""
+    db_topic = db.query(models.BuddyTopicLog).filter(
+        models.BuddyTopicLog.user_id == user_id,
+        models.BuddyTopicLog.dmbuddy == dmbuddy,
+        models.BuddyTopicLog.topic == topic
+    ).first()
+    if db_topic is None:
+        return None
+    db.delete(db_topic)
+    db.commit()
+    return db_topic
