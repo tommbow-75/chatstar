@@ -6,7 +6,7 @@ pinecone_ingestion.py
 
 啟動方式
 --------
-    python pinecone/pinecone_ingestion.py
+    python mypc/pinecone_ingestion.py
 
 需要的環境變數（.env）
 ----------------------
@@ -23,6 +23,7 @@ import json
 import select
 import logging
 from datetime import datetime, timezone
+from typing import List, Optional, Union
 
 import psycopg2
 import psycopg2.extensions
@@ -138,9 +139,15 @@ def listen_and_ingest() -> None:
 
                 docs = make_documents(notify.channel, notify.payload)
                 if docs:
-                    # add_documents 自動完成 embedding + upsert
-                    vector_store.add_documents(docs)
-                    logger.info("✅ 已寫入 %d 筆向量到 Pinecone", len(docs))
+                    try:
+                        # add_documents 自動完成 embedding + upsert
+                        logger.info("準備將 %d 筆文件寫入 Pinecone...", len(docs))
+                        vector_store.add_documents(docs)
+                        logger.info("✅ 已寫入 %d 筆向量到 Pinecone", len(docs))
+                    except Exception as e:
+                        logger.error("❌ 寫入 Pinecone 失敗: %s", e)
+                        import traceback
+                        logger.error(traceback.format_exc())
 
     except KeyboardInterrupt:
         logger.info("🛑 停止監聽。")
@@ -159,7 +166,7 @@ if __name__ == "__main__":
 # 資料庫端 TRIGGER 範例（PostgreSQL）
 # payload 格式: {"user_id": 123, "role": "user"|"buddy", "items": [...]}
 # ══════════════════════════════════════════════════════════════════════════════
-#
+
 # ── User preferences ──────────────────────────────────────────────────────────
 # CREATE OR REPLACE FUNCTION notify_user_preferences() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 # BEGIN
@@ -167,10 +174,11 @@ if __name__ == "__main__":
 #     json_build_object('user_id', NEW.user_id, 'role', 'user', 'items', NEW.preferences)::text);
 #   RETURN NEW;
 # END; $$;
+# DROP TRIGGER IF EXISTS trg_user_preferences ON users;
 # CREATE TRIGGER trg_user_preferences
 #   AFTER INSERT OR UPDATE OF preferences ON users
 #   FOR EACH ROW EXECUTE FUNCTION notify_user_preferences();
-#
+
 # ── UserTopicLog ──────────────────────────────────────────────────────────────
 # CREATE OR REPLACE FUNCTION notify_user_topic() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 # BEGIN
@@ -178,22 +186,24 @@ if __name__ == "__main__":
 #     json_build_object('user_id', NEW.user_id, 'role', 'user', 'items', ARRAY[NEW.topic])::text);
 #   RETURN NEW;
 # END; $$;
+# DROP TRIGGER IF EXISTS trg_user_topic ON user_topics_log;
 # CREATE TRIGGER trg_user_topic
-#   AFTER INSERT ON user_topic_logs
+#   AFTER INSERT ON user_topics_log
 #   FOR EACH ROW EXECUTE FUNCTION notify_user_topic();
-#
+
 # ── BuddyInfo preferences ─────────────────────────────────────────────────────
 # CREATE OR REPLACE FUNCTION notify_buddy_preferences() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 # BEGIN
 #   PERFORM pg_notify('buddy_preferences_updated',
 #     json_build_object('user_id', NEW.user_id, 'role', 'buddy',
-#       'items', NEW.buddy_prefs->'preferences')::text);
+#       'items', NEW.interests)::text);
 #   RETURN NEW;
 # END; $$;
+# DROP TRIGGER IF EXISTS trg_buddy_preferences ON buddy_info;
 # CREATE TRIGGER trg_buddy_preferences
-#   AFTER INSERT OR UPDATE OF buddy_prefs ON buddy_info
+#   AFTER INSERT OR UPDATE OF interests ON buddy_info
 #   FOR EACH ROW EXECUTE FUNCTION notify_buddy_preferences();
-#
+
 # ── BuddyTopicLog ─────────────────────────────────────────────────────────────
 # CREATE OR REPLACE FUNCTION notify_buddy_topic() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 # BEGIN
@@ -202,6 +212,7 @@ if __name__ == "__main__":
 #       'items', ARRAY[NEW.topic])::text);
 #   RETURN NEW;
 # END; $$;
+# DROP TRIGGER IF EXISTS trg_buddy_topic ON buddy_topics_log;
 # CREATE TRIGGER trg_buddy_topic
-#   AFTER INSERT ON buddy_topic_logs
+#   AFTER INSERT ON buddy_topics_log
 #   FOR EACH ROW EXECUTE FUNCTION notify_buddy_topic();

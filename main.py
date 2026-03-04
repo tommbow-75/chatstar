@@ -1,5 +1,6 @@
 import sys
 import os
+from PyQt6.QtCore import QThread
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from dotenv import load_dotenv
 
@@ -13,6 +14,7 @@ from core.ai_provider import GeminiProvider
 from core.scanner import ScreenScanner
 from core.memory_manager import MemoryManager
 from core.backend_thread import BackendThread
+from mypc.pinecone_ingestion import listen_and_ingest
 from backend.database import SessionLocal
 from backend.crud import get_user
 from backend.crud_setup import create_user_with_setup
@@ -26,8 +28,9 @@ selection_win = None
 scanner = None
 region_overlay = None   # 螢幕上的藍色框線
 memory_manager = None   # 工作記憶
-backend_thread = None   # FastAPI 後端伺服器執行緒
-data_manager_win = None  # 資料管理視窗
+backend_thread = None     # FastAPI 後端伺服器執行緒
+pinecone_thread = None    # Pinecone 監聽執行緒
+data_manager_win = None   # 資料管理視窗
 
 def start_backend():
     """啟動 FastAPI 背景伺服器"""
@@ -36,6 +39,24 @@ def start_backend():
         backend_thread = BackendThread(host="127.0.0.1", port=8000)
         backend_thread.started_signal.connect(lambda: print("🌟 FastAPI 後端伺服器已在 http://127.0.0.1:8000 啟動"))
         backend_thread.start()
+
+
+class _PineconeThread(QThread):
+    """將 listen_and_ingest 包在 QThread 中背景執行。"""
+    def run(self):
+        try:
+            listen_and_ingest()
+        except Exception as e:
+            print(f"[Pinecone] 監聽執行緒發生例外：{e}")
+
+
+def start_pinecone_listener():
+    """啟動 Pinecone 監聽背景執行緒（僅啟動一次）。"""
+    global pinecone_thread
+    if pinecone_thread is None:
+        pinecone_thread = _PineconeThread()
+        pinecone_thread.start()
+        print("🟢 Pinecone 監聽執行緒已啟動")
 
 
 def start_selection():
@@ -125,6 +146,9 @@ def main():
 
     # ── 啟動 FastAPI 伺服器 ──
     start_backend()
+
+    # ── 啟動 Pinecone 監聽服務 ──
+    start_pinecone_listener()
 
     # ─────────────────────────────────────────────────────────────────
     # 登入迴圈：LoginDialog → DB 查詢 → (新用戶) SetupWizard
@@ -216,11 +240,15 @@ def main():
     # 執行事件迴圈
     exit_code = app.exec()
 
-    # 關閉視窗後，停止背景的 FastAPI 伺服器
-    global backend_thread
+    # 關閉視窗後，停止背景的 FastAPI 伺服器與 Pinecone 監聽
+    global backend_thread, pinecone_thread
     if backend_thread:
         print("正在關閉 FastAPI 後端伺服器...")
         backend_thread.stop()
+    if pinecone_thread and pinecone_thread.isRunning():
+        print("正在關閉 Pinecone 監聽執行緒...")
+        pinecone_thread.terminate()
+        pinecone_thread.wait()
 
     sys.exit(exit_code)
 
