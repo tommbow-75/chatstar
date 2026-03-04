@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     """使用者資料的基底 Schema。"""
     user_id: str                                      # 使用者唯一識別碼
     username: str                                     # 使用者顯示名稱
-    interests: Optional[Dict[str, Any]] = None        # 使用者興趣與個人特質（供 AI 參考）
+    preferences: Optional[Dict[str, Any]] = None      # 使用者偏好與個人特質（供 AI 參考）
 
 class UserCreate(UserBase):
     """建立新使用者時使用的 Schema。"""
@@ -18,7 +18,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """更新使用者時使用的 Schema，所有欄位皆為可選。"""
     username: Optional[str] = None
-    interests: Optional[Dict[str, Any]] = None
+    preferences: Optional[Dict[str, Any]] = None
 
 class User(UserBase):
     """讀取使用者資料時的回應 Schema。"""
