@@ -1,16 +1,21 @@
 import sys
 import os
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from dotenv import load_dotenv
 
 from ui.main_window import MainWindow
 from ui.selection_window import SelectionWindow
 from ui.region_overlay import RegionOverlay
 from ui.data_manager_window import DataManagerWindow
+from ui.login_dialog import LoginDialog
+from ui.setup_wizard import SetupWizard
 from core.ai_provider import GeminiProvider
 from core.scanner import ScreenScanner
 from core.memory_manager import MemoryManager
 from core.backend_thread import BackendThread
+from backend.database import SessionLocal
+from backend.crud import get_user
+from backend.crud_setup import create_user_with_setup
 
 load_dotenv()  # 讀取 .env 中的 GEMINI_API_KEY
 
@@ -117,13 +122,76 @@ def main():
     global app, main_win
     print("啟動 AI Chat Assistant (Gemini Vision + 工作記憶模式)...")
     app = QApplication(sys.argv)
-    
-    # 啟動 FastAPI 伺服器
+
+    # ── 啟動 FastAPI 伺服器 ──
     start_backend()
 
+    # ──────────────────────────────────────────────────
+    # Step 1: 顯示登入對話框，讓使用者輸入 user_id
+    # ──────────────────────────────────────────────────
+    login = LoginDialog()
+    if login.exec() != LoginDialog.DialogCode.Accepted:
+        print("使用者取消登入，結束程式。")
+        sys.exit(0)
+
+    current_user_id = login.user_id
+    print(f"登入 user_id: {current_user_id}")
+
+    # ──────────────────────────────────────────────────
+    # Step 2: 查詢資料庫，若不存在則開啟設置嚮導
+    # ──────────────────────────────────────────────────
+    db = SessionLocal()
+    try:
+        user = get_user(db, current_user_id)
+    except Exception as e:
+        import traceback
+        detail = traceback.format_exc()
+        print(f"[DB ERROR]\n{detail}")
+        QMessageBox.critical(
+            None,
+            "資料庫連線失敗",
+            f"錯誤類型：{type(e).__name__}\n\n{e}\n\n"
+            "請確認：\n"
+            "1. .env 中的 DATABASE_URL 已正確設定\n"
+            "2. 網路可連線到資料庫伺服器"
+        )
+        db.close()
+        sys.exit(1)
+
+    if user is None:
+        # 新使用者 → 開啟設置嚮導
+        print(f"user_id '{current_user_id}' 不存在，啟動初始設置嚮導...")
+        wizard = SetupWizard(current_user_id)
+        if wizard.exec() != SetupWizard.DialogCode.Accepted:
+            print("使用者取消設置，結束程式。")
+            db.close()
+            sys.exit(0)
+
+        data = wizard.collect_data()
+        try:
+            create_user_with_setup(
+                db=db,
+                user_id=data["user_id"],
+                username=data["username"],
+                preferences=data["preferences"],
+                topics=data["topics"],
+            )
+            print(f"✅ 使用者 '{current_user_id}' 已建立：{data['username']}")
+        except Exception as e:
+            QMessageBox.critical(None, "儲存失敗", f"無法儲存使用者資料：\n{e}")
+            db.close()
+            sys.exit(1)
+    else:
+        print(f"✅ 已找到使用者：{user.username} (id={current_user_id})")
+
+    db.close()
+
+    # ──────────────────────────────────────────────────
+    # Step 3: 開啟主視窗
+    # ──────────────────────────────────────────────────
     main_win = MainWindow()
 
-    # 若 .env 中有 API Key，自動填入欄位
+    # 自動從 .env 填入 Gemini API Key
     env_key = os.getenv("GEMINI_API_KEY", "")
     if env_key:
         main_win.api_key_input.setText(env_key)
@@ -136,13 +204,13 @@ def main():
 
     # 執行事件迴圈
     exit_code = app.exec()
-    
+
     # 關閉視窗後，停止背景的 FastAPI 伺服器
     global backend_thread
     if backend_thread:
         print("正在關閉 FastAPI 後端伺服器...")
         backend_thread.stop()
-        
+
     sys.exit(exit_code)
 
 

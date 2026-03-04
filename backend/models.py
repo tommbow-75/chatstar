@@ -13,7 +13,7 @@ class User(Base):
 
     user_id = Column(String(50), primary_key=True, index=True)   # 使用者唯一識別碼（主鍵）
     username = Column(String(100), nullable=False)                # 使用者顯示名稱
-    interests = Column(JSONB)                                     # 使用者興趣與個人特質（JSON 格式，供 AI 參考）
+    preferences = Column(JSONB)                                   # 使用者偏好設定（JSON 格式）
 
     # ORM 關聯屬性（非資料庫欄位）：方便在 Python 中直接存取關聯資料
     buddies = relationship("BuddyInfo", back_populates="user", cascade="all, delete-orphan")         # 該使用者的所有聊天對象
