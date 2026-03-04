@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QFrame, QApplication,
-                             QLineEdit)
+                             QLineEdit, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from ui.reply_panel import ReplyPanel
 
@@ -46,14 +46,14 @@ class MainWindow(QMainWindow):
             QPushButton#btn_stop:hover { background-color: #f5a0b8; }
             QPushButton#btn_stop:disabled { background-color: #45475a; color: #6c7086; }
             QFrame#divider { background-color: #313244; }
-            QComboBox#style_combo {
+            QComboBox#style_combo, QComboBox#buddy_combo {
                 background-color: #313244; color: #cdd6f4;
                 border: 1px solid #45475a; border-radius: 6px;
                 padding: 3px 8px; font-size: 12px;
             }
-            QComboBox#style_combo:hover { border: 1px solid #89b4fa; }
-            QComboBox#style_combo::drop-down { border: none; width: 20px; }
-            QComboBox#style_combo QAbstractItemView {
+            QComboBox#style_combo:hover, QComboBox#buddy_combo:hover { border: 1px solid #89b4fa; }
+            QComboBox#style_combo::drop-down, QComboBox#buddy_combo::drop-down { border: none; width: 20px; }
+            QComboBox#style_combo QAbstractItemView, QComboBox#buddy_combo QAbstractItemView {
                 background-color: #313244; color: #cdd6f4;
                 selection-background-color: #45475a;
                 border: 1px solid #45475a; border-radius: 4px;
@@ -88,6 +88,18 @@ class MainWindow(QMainWindow):
         api_row.addWidget(api_label)
         api_row.addWidget(self.api_key_input)
         layout.addLayout(api_row)
+
+        # ── 聊天對象選擇 ──
+        buddy_row = QHBoxLayout()
+        buddy_label = QLabel("聊天對象：")
+        buddy_label.setStyleSheet("font-size: 12px; color: #6c7086;")
+        buddy_label.setFixedWidth(80)
+        self.buddy_combo = QComboBox()
+        self.buddy_combo.setObjectName("buddy_combo")
+        self.buddy_combo.addItem("通用（無特定對象）", userData=None)
+        buddy_row.addWidget(buddy_label)
+        buddy_row.addWidget(self.buddy_combo)
+        layout.addLayout(buddy_row)
 
         # ── 狀態 + 區域 ──
         status_row = QHBoxLayout()
@@ -192,3 +204,10 @@ class MainWindow(QMainWindow):
 
     def update_replies(self, replies: list):
         self.reply_panel.update_replies(replies)
+
+    def load_buddies(self, buddies: list):
+        """載入使用者的聊天對象至下拉選單"""
+        self.buddy_combo.clear()
+        self.buddy_combo.addItem("通用（無特定對象）", userData=None)
+        for buddy in buddies:
+            self.buddy_combo.addItem(buddy.dmbuddy, userData=buddy.id)
