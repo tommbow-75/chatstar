@@ -178,7 +178,7 @@ def main():
     # ──────────────────────────────────────────────────
     main_win = MainWindow()
 
-    # 若 .env 中有 API Key，自動填入欄位
+    # 自動從 .env 填入 Gemini API Key
     env_key = os.getenv("GEMINI_API_KEY", "")
     if env_key:
         main_win.api_key_input.setText(env_key)
