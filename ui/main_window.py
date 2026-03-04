@@ -45,6 +45,18 @@ class MainWindow(QMainWindow):
             QPushButton#btn_stop:hover { background-color: #f5a0b8; }
             QPushButton#btn_stop:disabled { background-color: #45475a; color: #6c7086; }
             QFrame#divider { background-color: #313244; }
+            QComboBox#style_combo {
+                background-color: #313244; color: #cdd6f4;
+                border: 1px solid #45475a; border-radius: 6px;
+                padding: 3px 8px; font-size: 12px;
+            }
+            QComboBox#style_combo:hover { border: 1px solid #89b4fa; }
+            QComboBox#style_combo::drop-down { border: none; width: 20px; }
+            QComboBox#style_combo QAbstractItemView {
+                background-color: #313244; color: #cdd6f4;
+                selection-background-color: #45475a;
+                border: 1px solid #45475a; border-radius: 4px;
+            }
         """)
 
         central = QWidget()
