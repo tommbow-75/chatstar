@@ -126,65 +126,69 @@ def main():
     # ── 啟動 FastAPI 伺服器 ──
     start_backend()
 
-    # ──────────────────────────────────────────────────
-    # Step 1: 顯示登入對話框，讓使用者輸入 user_id
-    # ──────────────────────────────────────────────────
-    login = LoginDialog()
-    if login.exec() != LoginDialog.DialogCode.Accepted:
-        print("使用者取消登入，結束程式。")
-        sys.exit(0)
-
-    current_user_id = login.user_id
-    print(f"登入 user_id: {current_user_id}")
-
-    # ──────────────────────────────────────────────────
-    # Step 2: 查詢資料庫，若不存在則開啟設置嚮導
-    # ──────────────────────────────────────────────────
-    db = SessionLocal()
-    try:
-        user = get_user(db, current_user_id)
-    except Exception as e:
-        import traceback
-        detail = traceback.format_exc()
-        print(f"[DB ERROR]\n{detail}")
-        QMessageBox.critical(
-            None,
-            "資料庫連線失敗",
-            f"錯誤類型：{type(e).__name__}\n\n{e}\n\n"
-            "請確認：\n"
-            "1. .env 中的 DATABASE_URL 已正確設定\n"
-            "2. 網路可連線到資料庫伺服器"
-        )
-        db.close()
-        sys.exit(1)
-
-    if user is None:
-        # 新使用者 → 開啟設置嚮導
-        print(f"user_id '{current_user_id}' 不存在，啟動初始設置嚮導...")
-        wizard = SetupWizard(current_user_id)
-        if wizard.exec() != SetupWizard.DialogCode.Accepted:
-            print("使用者取消設置，結束程式。")
-            db.close()
+    # ─────────────────────────────────────────────────────────────────
+    # 登入迴圈：LoginDialog → DB 查詢 → (新用戶) SetupWizard
+    # 嚮導任一頁按「取消」→ continue 回到 LoginDialog
+    # LoginDialog 按「取消」→ 結束程式
+    # ─────────────────────────────────────────────────────────────────
+    while True:
+        # Step 1: 登入對話框
+        login = LoginDialog()
+        if login.exec() != LoginDialog.DialogCode.Accepted:
+            print("使用者取消登入，結束程式。")
             sys.exit(0)
 
-        data = wizard.collect_data()
+        current_user_id = login.user_id
+        print(f"登入 user_id: {current_user_id}")
+
+        # Step 2: 查詢資料庫
+        db = SessionLocal()
         try:
-            create_user_with_setup(
-                db=db,
-                user_id=data["user_id"],
-                username=data["username"],
-                preferences=data["preferences"],
-                topics=data["topics"],
-            )
-            print(f"✅ 使用者 '{current_user_id}' 已建立：{data['username']}")
+            user = get_user(db, current_user_id)
         except Exception as e:
-            QMessageBox.critical(None, "儲存失敗", f"無法儲存使用者資料：\n{e}")
+            import traceback
+            print(f"[DB ERROR]\n{traceback.format_exc()}")
+            QMessageBox.critical(
+                None,
+                "資料庫連線失敗",
+                f"錯誤類型：{type(e).__name__}\n\n{e}\n\n"
+                "請確認：\n"
+                "1. .env 中的 DATABASE_URL 已正確設定\n"
+                "2. 網路可連線到資料庫伺服器"
+            )
             db.close()
             sys.exit(1)
-    else:
-        print(f"✅ 已找到使用者：{user.username} (id={current_user_id})")
 
-    db.close()
+        if user is None:
+            # 新使用者 → 開啟設置嚮導
+            print(f"user_id '{current_user_id}' 不存在，啟動初始設置嚮導...")
+            wizard = SetupWizard(current_user_id)
+            if wizard.exec() != SetupWizard.DialogCode.Accepted:
+                # 任一頁按「取消」→ 回到登入畫面
+                print("使用者取消設置，回到登入畫面。")
+                db.close()
+                continue
+
+            data = wizard.collect_data()
+            try:
+                create_user_with_setup(
+                    db=db,
+                    user_id=data["user_id"],
+                    username=data["username"],
+                    preferences=data["preferences"],
+                    topics=data["topics"],
+                )
+                print(f"✅ 使用者 '{current_user_id}' 已建立：{data['username']}")
+            except Exception as e:
+                QMessageBox.critical(None, "儲存失敗", f"無法儲存使用者資料：\n{e}")
+                db.close()
+                sys.exit(1)
+        else:
+            print(f"✅ 已找到使用者：{user.username} (id={current_user_id})")
+
+        db.close()
+        break  # 登入 / 設置完成，進入主視窗
+
 
     # ──────────────────────────────────────────────────
     # Step 3: 開啟主視窗
