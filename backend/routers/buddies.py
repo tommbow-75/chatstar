@@ -38,3 +38,25 @@ def read_buddy(buddy_id: int, db: Session = Depends(get_db)):
     if db_buddy is None:
         raise HTTPException(status_code=404, detail="Buddy not found")
     return db_buddy
+
+@router.put("/{buddy_id}", response_model=schemas.BuddyInfo)
+def update_buddy(buddy_id: int, buddy_update: schemas.BuddyInfoUpdate, db: Session = Depends(get_db)):
+    """
+    [PUT /buddies/{buddy_id}] 更新指定 AI 好友的設定。
+    支援部分更新，若好友不存在則回傳 404 錯誤。
+    """
+    db_buddy = crud.update_buddy(db, buddy_id=buddy_id, buddy_update=buddy_update)
+    if db_buddy is None:
+        raise HTTPException(status_code=404, detail="Buddy not found")
+    return db_buddy
+
+@router.delete("/{buddy_id}", response_model=schemas.BuddyInfo)
+def delete_buddy(buddy_id: int, db: Session = Depends(get_db)):
+    """
+    [DELETE /buddies/{buddy_id}] 刪除指定 AI 好友設定。
+    若好友不存在則回傳 404 錯誤。
+    """
+    db_buddy = crud.delete_buddy(db, buddy_id=buddy_id)
+    if db_buddy is None:
+        raise HTTPException(status_code=404, detail="Buddy not found")
+    return db_buddy

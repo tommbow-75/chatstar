@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from ui.main_window import MainWindow
 from ui.selection_window import SelectionWindow
 from ui.region_overlay import RegionOverlay
+from ui.data_manager_window import DataManagerWindow
 from core.ai_provider import GeminiProvider
 from core.scanner import ScreenScanner
 from core.memory_manager import MemoryManager
@@ -21,6 +22,7 @@ scanner = None
 region_overlay = None   # 螢幕上的藍色框線
 memory_manager = None   # 工作記憶
 backend_thread = None   # FastAPI 後端伺服器執行緒
+data_manager_win = None  # 資料管理視窗
 
 def start_backend():
     """啟動 FastAPI 背景伺服器"""
@@ -100,6 +102,17 @@ def on_stop_scanner():
     _stop_scanner()
 
 
+def open_data_manager():
+    """開啟資料管理視窗（若已開啟則喚起到前景）。"""
+    global data_manager_win
+    if data_manager_win is None or not data_manager_win.isVisible():
+        data_manager_win = DataManagerWindow()
+        data_manager_win.show()
+    else:
+        data_manager_win.raise_()
+        data_manager_win.activateWindow()
+
+
 def main():
     global app, main_win
     print("啟動 AI Chat Assistant (Gemini Vision + 工作記憶模式)...")
@@ -118,6 +131,7 @@ def main():
 
     main_win.start_selection.connect(start_selection)
     main_win.stop_scanner.connect(on_stop_scanner)
+    main_win.open_data_manager.connect(open_data_manager)
     main_win.show()
 
     # 執行事件迴圈
