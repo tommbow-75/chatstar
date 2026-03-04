@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     """使用者資料的基底 Schema。"""
     user_id: str                                      # 使用者唯一識別碼
     username: str                                     # 使用者顯示名稱
-    preferences: Optional[Dict[str, Any]] = None      # 使用者偏好與個人特質（供 AI 參考）
+    preferences: Optional[List[str]] = None           # 使用者興趣標籤列表（如 ["音樂", "旅遊"]）
 
 class UserCreate(UserBase):
     """建立新使用者時使用的 Schema。"""
@@ -18,7 +18,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """更新使用者時使用的 Schema，所有欄位皆為可選。"""
     username: Optional[str] = None
-    preferences: Optional[Dict[str, Any]] = None
+    preferences: Optional[List[str]] = None
 
 class User(UserBase):
     """讀取使用者資料時的回應 Schema。"""
@@ -31,7 +31,7 @@ class User(UserBase):
 class BuddyInfoBase(BaseModel):
     """聊天對象的基底 Schema。"""
     dmbuddy: str                                       # 聊天對象名稱
-    interests: Optional[Dict[str, Any]] = None         # 聊天對象的興趣與特質（供 AI 參考）
+    interests: Optional[List[str]] = None             # 聊天對象的興趣標籤列表（如 ["音樂", "旅遊"]）
 
 class BuddyInfoCreate(BuddyInfoBase):
     """建立新聊天對象時使用的 Schema，需額外提供所屬的 user_id。"""
@@ -40,7 +40,7 @@ class BuddyInfoCreate(BuddyInfoBase):
 class BuddyInfoUpdate(BaseModel):
     """更新聊天對象時使用的 Schema，所有欄位皆為可選。"""
     dmbuddy: Optional[str] = None
-    interests: Optional[Dict[str, Any]] = None
+    interests: Optional[List[str]] = None
 
 class BuddyInfo(BuddyInfoBase):
     """讀取聊天對象資料時的回應 Schema。"""

@@ -49,3 +49,43 @@ def read_buddy_topics(user_id: str, dmbuddy: str, db: Session = Depends(get_db))
     [GET /topics/users/{user_id}/buddies/{dmbuddy}] 取得指定使用者與特定 AI 好友的所有共同話題記錄。
     """
     return crud.get_buddy_topics(db, user_id=user_id, dmbuddy=dmbuddy)
+
+@router.delete("/users/{user_id}/topic", response_model=schemas.UserTopicLog)
+def delete_user_topic(user_id: str, topic: str, db: Session = Depends(get_db)):
+    """
+    [DELETE /topics/users/{user_id}/topic?topic=...] 刪除指定使用者的某條個人話題。
+    """
+    result = crud.delete_user_topic(db, user_id=user_id, topic=topic)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    return result
+
+@router.delete("/users/{user_id}/buddies/{dmbuddy}/topic", response_model=schemas.BuddyTopicLog)
+def delete_buddy_topic(user_id: str, dmbuddy: str, topic: str, db: Session = Depends(get_db)):
+    """
+    [DELETE /topics/users/{user_id}/buddies/{dmbuddy}/topic?topic=...] 刪除指定的聊天話題。
+    """
+    result = crud.delete_buddy_topic(db, user_id=user_id, dmbuddy=dmbuddy, topic=topic)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    return result
+
+@router.post("/users/{user_id}/topic", response_model=schemas.UserTopicLog)
+def add_user_topic_quick(user_id: str, topic: str, db: Session = Depends(get_db)):
+    """
+    [POST /topics/users/{user_id}/topic?topic=...] 快速新增個人話題（query param 版）。
+    """
+    db_user = crud.get_user(db, user_id=user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return crud.create_user_topic(db=db, topic=schemas.UserTopicLogCreate(user_id=user_id, topic=topic))
+
+@router.post("/users/{user_id}/buddies/{dmbuddy}/topic", response_model=schemas.BuddyTopicLog)
+def add_buddy_topic_quick(user_id: str, dmbuddy: str, topic: str, db: Session = Depends(get_db)):
+    """
+    [POST /topics/users/{user_id}/buddies/{dmbuddy}/topic?topic=...] 快速新增聊天話題（query param 版）。
+    """
+    db_user = crud.get_user(db, user_id=user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return crud.create_buddy_topic(db=db, topic=schemas.BuddyTopicLogCreate(user_id=user_id, dmbuddy=dmbuddy, topic=topic))

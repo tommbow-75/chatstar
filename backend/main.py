@@ -8,6 +8,20 @@ from backend.routers import users, buddies, chats, topics
 # 若資料表已存在則不會重建（不會刪除舊資料）
 models.Base.metadata.create_all(bind=engine)
 
+# ── 自動 schema migration：補充舊版資料庫缺少的欄位 ──
+# create_all 只建立不存在的「表格」，不會自動添加新的「欄位」。
+# 以下在啟動時執行 DDL，為既有資料表補齊新欄位（已存在則跳過）。
+try:
+    with engine.connect() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE buddy_info ADD COLUMN IF NOT EXISTS interests JSONB"
+            )
+        )
+        conn.commit()
+except Exception as _e:
+    print(f"[Migration] buddy_info.interests 欄位檢查失敗（可忽略）: {_e}")
+
 # 建立 FastAPI 應用程式實例，設定 API 文件標題、描述與版本號
 app = FastAPI(
     title="ChatStar Backend API",

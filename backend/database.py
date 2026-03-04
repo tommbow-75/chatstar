@@ -26,6 +26,16 @@ SQLALCHEMY_DATABASE_URL = _url
 # pool_pre_ping=True：每次取用連線前先 ping，避免 idle 後連線失效
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
+# 讓 psycopg2 能自動將 Python dict/list 序列化為 JSONB
+# register_adapter(dict, Json)：插入 dict 時以 JSON 字串形式傳給 PostgreSQL
+# 這是解決「column is of type jsonb but expression is of type text」的標準做法
+try:
+    from psycopg2.extensions import register_adapter
+    from psycopg2.extras import Json
+    register_adapter(dict, Json)
+except Exception:
+    pass
+
 
 # 建立 Session 工廠，每次呼叫 SessionLocal() 會產生一個新的資料庫 Session
 # autocommit=False: 需手動 commit；autoflush=False: 不自動刷新至資料庫
