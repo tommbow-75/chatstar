@@ -74,6 +74,8 @@ SUGGEST_SYSTEM_PROMPT = """\
 - 靠左的訊息泡泡（通常是白色底）是【對方】說的話
 - 靠右的訊息泡泡（通常是綠色底）是【我】說的話
 
+{long_term_section}
+
 {context_section}
 
 請根據以上背景與截圖中最新的對話內容，生成 3 種不同風格的繁體中文回覆建議：
@@ -178,17 +180,40 @@ class GeminiProvider(BaseAIProvider):
 
     # ──────────── 建議生成方法 ────────────
 
-    def analyze_chat_image(self, image: Image.Image, context: str = "") -> List[str]:
+    def analyze_chat_image(
+        self,
+        image: Image.Image,
+        context: str = "",
+        long_term_context: str = "",
+    ) -> List[str]:
         """
-        傳送圖像（加上對話背景 context）給 Gemini，回傳 3 種回覆建議。
-        context 由 MemoryManager.get_context_prompt() 提供。
+        傳送圖像（加上對話背景）給 Gemini，回傳 3 種回覆建議。
+
+        Parameters
+        ----------
+        context : str
+            短期記憶：由 MemoryManager.get_context_prompt() 提供的近期 8 則對話。
+        long_term_context : str
+            長期記憶：由 Pinecone search_service 查詢的相關資訊。
+            若為空字串，則此區塊不顯示在 Prompt 中。
         """
+        if long_term_context:
+            long_term_section = (
+                "【長期記憶】關於聊天對象的已知資訊（供參考）：\n"
+                + long_term_context
+            )
+        else:
+            long_term_section = ""
+
         if context:
             context_section = context
         else:
             context_section = "（無對話背景記錄）"
 
-        prompt = SUGGEST_SYSTEM_PROMPT.format(context_section=context_section)
+        prompt = SUGGEST_SYSTEM_PROMPT.format(
+            long_term_section=long_term_section,
+            context_section=context_section,
+        )
         raw = self._call_gemini(image, prompt)
 
         try:

@@ -29,9 +29,18 @@ class ScreenScanner(QThread):
         ai_provider: BaseAIProvider,
         memory_manager: MemoryManager,
         interval: float = 2.0,
+        user_id: str = "",
+        partner_name: str = "",
     ):
         """
-        region 格式: {'top': y, 'left': x, 'width': w, 'height': h}
+        Parameters
+        ----------
+        region : dict
+            截圖區域，格式: {'top': y, 'left': x, 'width': w, 'height': h}
+        user_id : str
+            目前登入的使用者 ID（用於 Pinecone 長期記憶查詢）。
+        partner_name : str
+            當前選取的聊天對象名稱（用於 Pinecone 長期記憶查詢）。
         """
         super().__init__()
         self.region = region
@@ -40,13 +49,36 @@ class ScreenScanner(QThread):
         self.interval = interval
         self.running = True
         self.last_image: Image.Image | None = None
+        self.user_id = user_id
+        self.partner_name = partner_name
 
     def _capture(self, sct) -> Image.Image:
         sct_img = sct.grab(self.region)
         return Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
 
+    def _get_long_term_context(self, query: str) -> str:
+        """
+        向 Pinecone 查詢與當前對話最相關的長期記憶。
+        若未設定 user_id / partner_name，或查詢失敗，回傳空字串。
+        """
+        if not self.user_id or not self.partner_name:
+            return ""
+        try:
+            from vector_db.search_service import search_long_term_context
+            return search_long_term_context(
+                user_id=self.user_id,
+                partner_name=self.partner_name,
+                query=query,
+                top_k=5,
+            )
+        except Exception as e:
+            print(f"[長期記憶] Pinecone 查詢失敗（不影響主流程）: {e}")
+            return ""
+
     def run(self):
         print(f"開始監聽區域: {self.region}")
+        if self.partner_name:
+            print(f"[長期記憶] 啟用 - user={self.user_id}, partner={self.partner_name}")
         self.status_update.emit("監聽中，等待對話變化...")
 
         with mss.mss() as sct:
@@ -65,10 +97,15 @@ class ScreenScanner(QThread):
                         messages = self.ai_provider.extract_all_messages(current_img)
                         self.memory.add_messages(messages)
 
-                        # 用全量 context 生成建議
+                        # 用全量 context 生成建議，同時查詢 Pinecone 長期記憶
                         self.status_update.emit("初始分析中，正在生成建議...")
                         context = self.memory.get_context_prompt()
-                        replies = self.ai_provider.analyze_chat_image(current_img, context)
+                        # 用最新一則訊息作為 Pinecone 查詢語句（若有）
+                        query_text = messages[0] if messages else "聊天對話"
+                        long_term = self._get_long_term_context(query_text)
+                        replies = self.ai_provider.analyze_chat_image(
+                            current_img, context, long_term_context=long_term
+                        )
                         self.replies_ready.emit(replies)
                         self.status_update.emit("✅ 初始分析完成，持續監聽中...")
 
@@ -86,9 +123,12 @@ class ScreenScanner(QThread):
                         else:
                             self.status_update.emit("畫面有小幅變化，重新生成建議...")
 
-                        # 用最新 context（含新訊息）生成建議
+                        # 用最新訊息查詢 Pinecone，取得長期記憶補充
                         context = self.memory.get_context_prompt()
-                        replies = self.ai_provider.analyze_chat_image(current_img, context)
+                        long_term = self._get_long_term_context(latest or "聊天對話")
+                        replies = self.ai_provider.analyze_chat_image(
+                            current_img, context, long_term_context=long_term
+                        )
                         self.replies_ready.emit(replies)
                         self.status_update.emit("✅ 分析完成！監聽中...")
 

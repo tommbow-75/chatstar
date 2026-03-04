@@ -60,7 +60,8 @@ class UserTopicLog(Base):
     記錄使用者個人感興趣的對話話題，使用 (user_id, topic) 作為複合主鍵以防止重複。
     """
     __tablename__ = "user_topics_log"
-    # SQLAlchemy mapped class needs a primary key, so we use a composite primary key strategy
+    # 獨立自增 ID（非主鍵，作為 Pinecone Vector ID 的唯一基準）
+    id = Column(Integer, autoincrement=True, unique=True, index=True)                                # Pinecone 同步用唯一識別碼
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True) # 所屬使用者（外鍵，複合主鍵之一）
     topic = Column(Text, primary_key=True)                                                           # 話題內容（複合主鍵之一）
     created_at = Column(DateTime, server_default=func.now())                                         # 話題新增時間
@@ -75,6 +76,8 @@ class BuddyTopicLog(Base):
     """
     __tablename__ = "buddy_topics_log"
 
+    # 獨立自增 ID（非主鍵，作為 Pinecone Vector ID 的唯一基準）
+    id = Column(Integer, autoincrement=True, unique=True, index=True)                                # Pinecone 同步用唯一識別碼
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True) # 所屬使用者（外鍵，複合主鍵之一）
     dmbuddy = Column(String(100), primary_key=True)                                                  # 對應的 AI 好友名稱（複合主鍵之一）
     topic = Column(Text, primary_key=True)                                                           # 話題內容（複合主鍵之一）
