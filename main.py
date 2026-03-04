@@ -9,6 +9,7 @@ from ui.region_overlay import RegionOverlay
 from core.ai_provider import GeminiProvider
 from core.scanner import ScreenScanner
 from core.memory_manager import MemoryManager
+from core.backend_thread import BackendThread
 
 load_dotenv()  # 讀取 .env 中的 GEMINI_API_KEY
 
@@ -19,6 +20,15 @@ selection_win = None
 scanner = None
 region_overlay = None   # 螢幕上的藍色框線
 memory_manager = None   # 工作記憶
+backend_thread = None   # FastAPI 後端伺服器執行緒
+
+def start_backend():
+    """啟動 FastAPI 背景伺服器"""
+    global backend_thread
+    if backend_thread is None:
+        backend_thread = BackendThread(host="127.0.0.1", port=8000)
+        backend_thread.started_signal.connect(lambda: print("🌟 FastAPI 後端伺服器已在 http://127.0.0.1:8000 啟動"))
+        backend_thread.start()
 
 
 def start_selection():
@@ -94,6 +104,9 @@ def main():
     global app, main_win
     print("啟動 AI Chat Assistant (Gemini Vision + 工作記憶模式)...")
     app = QApplication(sys.argv)
+    
+    # 啟動 FastAPI 伺服器
+    start_backend()
 
     main_win = MainWindow()
 
@@ -107,7 +120,16 @@ def main():
     main_win.stop_scanner.connect(on_stop_scanner)
     main_win.show()
 
-    sys.exit(app.exec())
+    # 執行事件迴圈
+    exit_code = app.exec()
+    
+    # 關閉視窗後，停止背景的 FastAPI 伺服器
+    global backend_thread
+    if backend_thread:
+        print("正在關閉 FastAPI 後端伺服器...")
+        backend_thread.stop()
+        
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

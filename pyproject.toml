@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115.0",
     "google-genai>=1.65.0",
     "mss>=10.1.0",
     "pillow>=12.1.1",
@@ -12,4 +13,7 @@ dependencies = [
     "pyqt6>=6.10.2",
     "pytesseract>=0.3.13",
     "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.0",
+    "uvicorn>=0.30.0",
+    "psycopg2-binary>=2.9.9",
 ]
