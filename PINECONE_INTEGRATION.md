@@ -42,6 +42,32 @@ Gemini Prompt = [長期記憶] + [短期記憶 8則] + 截圖
 
 > **重要**：Index 已設定 `embed.fieldMap.text = "text"`，Pinecone Inference API 會自動將傳入的 `text` 欄位向量化，程式碼中**不需要自行呼叫 Embedding 模型**。
 
+### 手動環境建置步驟（供開發者重現環境）
+
+若您是新加入此專案的協作者，請依照以下步驟建立專屬的 Pinecone 環境：
+
+1. **註冊/登入 Pinecone**：前往 [Pinecone 官網](https://www.pinecone.io/) 註冊並登入（免費方案即可）。
+2. **建立 Index**：進入左側選單的 **Indexes**，點擊右上角 **Create Index** 按鈕。
+3. **填寫 Index 基本資訊**：
+   - **Index Name**: 輸入 `chatstar`（若改名，後續需在 `.env` 同步修改）
+   - **Dimensions**: 填寫 **1024**（非常重要，不能填錯）
+   - **Metric**: 選擇 **cosine**
+4. **設定 Inference Model（整合 Embedding）**：
+   - 勾選或進入設定 Inference 功能的選項（視當時介面而定，通常在 Setup 階段）。
+   - Model 選擇：**multilingual-e5-large**。
+   - Field Map 設定：配置 `text` 作為被向量化的目標欄位（讓系統知道要針對哪一個 JSON 欄位進行 Embedding）。
+5. **選擇基礎架構**：
+   - 選擇 **Serverless** 架構。
+   - Region 可選擇 AWS `us-east-1`（或其他離您最近的區域）。
+6. **取得 API Key 並設定專案**：
+   - 點擊建立後，前往左側選單的 **API Keys**。
+   - 複製您的 Default Key。
+   - 在專案根目錄下的 `.env` 檔案中加入：
+     ```env
+     PINECONE_API_KEY=您剛剛複製的金鑰
+     PINECONE_INDEX=chatstar
+     ```
+
 ---
 
 ## Namespace 命名規則

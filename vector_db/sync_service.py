@@ -42,6 +42,7 @@ Vector Record 格式（傳入 upsert_vectors 的 records 列表）
 import logging
 import os
 import threading
+import urllib.parse
 from typing import Any
 
 from dotenv import load_dotenv
@@ -126,7 +127,10 @@ def delete_by_ids(namespace: str, ids: list[str]) -> None:
         idx.delete(ids=ids, namespace=namespace)
         logger.info("🗑️ Pinecone 已刪除 %d 筆 → namespace='%s'", len(ids), namespace)
     except Exception as e:
-        logger.error("❌ Pinecone delete 失敗 (namespace=%s, ids=%s): %s", namespace, ids, e)
+        if "404" in str(e) or "Namespace not found" in str(e):
+            logger.info("ℹ️ Pinecone namespace '%s' 不存在，無需依 ID 刪除", namespace)
+        else:
+            logger.error("❌ Pinecone delete 失敗 (namespace=%s, ids=%s): %s", namespace, ids, e)
 
 
 def delete_namespace(namespace: str) -> None:
@@ -146,7 +150,10 @@ def delete_namespace(namespace: str) -> None:
         idx.delete(delete_all=True, namespace=namespace)
         logger.info("🗑️ Pinecone namespace '%s' 已全部清空", namespace)
     except Exception as e:
-        logger.error("❌ Pinecone delete_all 失敗 (namespace=%s): %s", namespace, e)
+        if "404" in str(e) or "Namespace not found" in str(e):
+            logger.info("ℹ️ Pinecone namespace '%s' 不存在，無需清空", namespace)
+        else:
+            logger.error("❌ Pinecone delete_all 失敗 (namespace=%s): %s", namespace, e)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -155,21 +162,25 @@ def delete_namespace(namespace: str) -> None:
 
 def ns_user_prefs(user_id: str) -> str:
     """回傳使用者偏好的 Namespace 名稱。"""
-    return f"{user_id}_user_prefs"
+    safe_uid = urllib.parse.quote(user_id.replace(" ", "_"))
+    return f"{safe_uid}_user_prefs"
 
 def ns_user_topics(user_id: str) -> str:
     """回傳使用者話題的 Namespace 名稱。"""
-    return f"{user_id}_user_topics"
+    safe_uid = urllib.parse.quote(user_id.replace(" ", "_"))
+    return f"{safe_uid}_user_topics"
 
 def ns_buddy_prefs(user_id: str, dmbuddy: str) -> str:
     """回傳聊天對象偏好的 Namespace 名稱。"""
-    safe_buddy = dmbuddy.replace(" ", "_")
-    return f"{user_id}_{safe_buddy}_buddy_prefs"
+    safe_uid = urllib.parse.quote(user_id.replace(" ", "_"))
+    safe_buddy = urllib.parse.quote(dmbuddy.replace(" ", "_"))
+    return f"{safe_uid}_{safe_buddy}_buddy_prefs"
 
 def ns_buddy_topics(user_id: str, dmbuddy: str) -> str:
     """回傳聊天對象話題的 Namespace 名稱。"""
-    safe_buddy = dmbuddy.replace(" ", "_")
-    return f"{user_id}_{safe_buddy}_buddy_topics"
+    safe_uid = urllib.parse.quote(user_id.replace(" ", "_"))
+    safe_buddy = urllib.parse.quote(dmbuddy.replace(" ", "_"))
+    return f"{safe_uid}_{safe_buddy}_buddy_topics"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
