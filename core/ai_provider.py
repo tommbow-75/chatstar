@@ -96,7 +96,7 @@ class GeminiProvider(BaseAIProvider):
     MAX_EDGE = 1024     # 長邊上限（px）；1024 在 Token 與文字辨識清晰度間取得較佳平衡
     JPEG_QUALITY = 85   # JPEG 品質（80-90 為文字辨識的最佳平衡點）
 
-    def __init__(self, api_key: str, model: str = "gemini-flash-latest"):
+    def __init__(self, api_key: str, model: str = "gemini-3.1-flash-lite-preview"):
         if not GENAI_AVAILABLE:
             raise ImportError("請執行 `uv add google-genai` 安裝 Gemini SDK")
         self.client = genai.Client(api_key=api_key)
