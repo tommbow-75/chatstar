@@ -1,6 +1,7 @@
 """backend/crud_setup.py — 設置嚮導專用的一次性寫入 helper。
 
-將 username、preferences（JSONB）、topics 一次性儲存至資料庫。
+將 username、preferences（JSONB）、topics 一次性儲存至資料庫，
+並同步至 Pinecone 向量資料庫。
 """
 
 from sqlalchemy.orm import Session
@@ -33,12 +34,26 @@ def create_user_with_setup(
     db.add(user)
     db.flush()  # 先 flush 取得 user_id 以供外鍵使用，尚未 commit
 
-    # 2. 批次新增話題記錄
+    # 2. 批次新增話題記錄（保留物件參考，commit 後要 refresh 取得 SERIAL id）
+    topic_objs = []
     for topic in topics:
         if not topic:
             continue
-        db.add(UserTopicLog(user_id=user_id, topic=topic))
+        obj = UserTopicLog(user_id=user_id, topic=topic)
+        db.add(obj)
+        topic_objs.append(obj)
 
     db.commit()
     db.refresh(user)
+    for obj in topic_objs:
+        db.refresh(obj)  # 取得資料庫 SERIAL 自動生成的 id
+
+    # 3. 同步至 Pinecone（背景執行，不阻塞 UI）
+    from .crud import _run_in_background, _sync_user_prefs, _sync_add_user_topic
+    if preferences:
+        _run_in_background(_sync_user_prefs, user_id, preferences)
+    for obj in topic_objs:
+        if obj.id is not None:
+            _run_in_background(_sync_add_user_topic, user_id, obj.id, obj.topic)
+
     return user

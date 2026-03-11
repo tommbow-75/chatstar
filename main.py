@@ -28,6 +28,7 @@ region_overlay = None   # 螢幕上的藍色框線
 memory_manager = None   # 工作記憶
 backend_thread = None   # FastAPI 後端伺服器執行緒
 data_manager_win = None  # 資料管理視窗
+current_user_id: str = ""  # 目前登入的使用者 ID（供全局共享）
 
 def start_backend():
     """啟動 FastAPI 背景伺服器"""
@@ -49,7 +50,7 @@ def start_selection():
 
 def on_region_selected(region):
     """使用者完成選取後，顯示框線、初始化 AI 與記憶、啟動掃描。"""
-    global scanner, region_overlay, memory_manager
+    global scanner, region_overlay, memory_manager, current_user_id
 
     # 更新螢幕上的區域框線
     if region_overlay is not None:
@@ -80,11 +81,16 @@ def on_region_selected(region):
 
     main_win.set_scanning(region)
 
+    # 取得目前選取的聊天對象名稱（供 Pinecone 長期記憶檢索使用）
+    partner_name = main_win.get_selected_buddy() if hasattr(main_win, "get_selected_buddy") else ""
+
     scanner = ScreenScanner(
         region=region,
         ai_provider=ai_provider,
         memory_manager=memory_manager,
         interval=2.0,
+        user_id=current_user_id,
+        partner_name=partner_name,
     )
     scanner.replies_ready.connect(main_win.update_replies)
     scanner.status_update.connect(main_win.set_status)
@@ -119,7 +125,7 @@ def open_data_manager(user_id: str = ""):
 
 
 def main():
-    global app, main_win
+    global app, main_win, current_user_id
     print("啟動 AI Chat Assistant (Gemini Vision + 工作記憶模式)...")
     app = QApplication(sys.argv)
 

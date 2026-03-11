@@ -10,7 +10,8 @@ ChatStar 是一款 PC 端桌面應用程式，透過**螢幕截圖 + Gemini Visi
 |------|------|
 | 📷 自訂監聽區域 | 全螢幕半透明遮罩，拖拉框選任意對話視窗區域 |
 | 🔄 即時首掃 | 框選後立即分析當前對話，無需等待畫面變動 |
-| 🧠 工作記憶系統 | 首次全量提取對話脈絡，後續增量追蹤最新訊息 |
+| 🧠 短期工作記憶 | 首次全量提取對話脈絡，後續增量追蹤最新訊息（近期 8 則） |
+| 📁 長期記憶（RAG） | 透過 Pinecone 語意搜尋，將聊天對象的偏好、話題自動帶入回覆建議 |
 | 💬 三風格回覆建議 | 正式 / 輕鬆 / 簡短，點擊即複製到剪貼簿 |
 | 🔵 區域視覺化 | 螢幕上以藍色邊框精準標示目前監聽範圍 |
 | ♻️ 重新框選 | 掃描中可直接重新框選，記憶自動清空重置 |
@@ -20,8 +21,9 @@ ChatStar 是一款 PC 端桌面應用程式，透過**螢幕截圖 + Gemini Visi
 
 ## 環境需求
 
-- **Python 3.12+** 與 **`uv`** 套件管理工具（[安裝 uv](https://docs.astral.sh/uv/getting-started/installation/)）
-- **Google Gemini API Key**（[取得免費額度](https://aistudio.google.com/app/apikey)）
+- **Python 3.12+** 與 **`uv`** 套件管理工具（[\u5b89\u88dd uv](https://docs.astral.sh/uv/getting-started/installation/)\uff09
+- **Google Gemini API Key**\uff08[取得免費額度](https://aistudio.google.com/app/apikey)\uff09
+- **Pinecone API Key** 與 index `chatstar`\uff08免費方案即可，[\u7533\u8acb](https://www.pinecone.io)\uff09
 
 ---
 
@@ -35,9 +37,9 @@ cd chatstar
 # 2. 建立虛擬環境並安裝依賴
 uv sync
 
-# 3. 填入 Gemini API Key
+# 3. 填入 API Key
 cp .env.example .env
-# 編輯 .env，填入 GEMINI_API_KEY=AIza...
+# 編輯 .env，填入 GEMINI_API_KEY 與 PINECONE_API_KEY
 ```
 
 ---
@@ -67,16 +69,26 @@ uv run main.py
 ```
 chatstar/
 ├── main.py                   # 應用程式入口 & 流程控制
+├── PINECONE_INTEGRATION.md   # Pinecone RAG 整合詳細文件
 ├── .env                      # API Key 設定（不提交 git）
 ├── core/
 │   ├── ai_provider.py        # AI 抽象層 + GeminiProvider 實作
-│   ├── memory_manager.py     # 工作記憶（對話 buffer 管理）
+│   ├── memory_manager.py     # 短期工作記憶（近期對話 buffer）
 │   └── scanner.py            # 背景截圖 & 差異偵測執行緒
-└── ui/
-    ├── main_window.py        # 主控制面板視窗
-    ├── selection_window.py   # 全螢幕透明選取視窗（含 DPI 換算）
-    ├── region_overlay.py     # 螢幕區域藍框標示（穿透視窗）
-    └── reply_panel.py        # 三張回覆建議卡片 + 複製按鈕
+├── ui/
+│   ├── main_window.py        # 主控制面板視窗
+│   ├── selection_window.py   # 全螢幕透明選取視窗（含 DPI 換算）
+│   ├── region_overlay.py     # 螢幕區域藍框標示（穿透視窗）
+│   └── reply_panel.py        # 三張回覆建議卡片 + 複製按鈕
+├── vector_db/
+│   ├── sync_service.py       # Pinecone 寫入/刪除核心（自動 Embedding）
+│   └── search_service.py     # Pinecone 語意搜尋（RAG 長期記憶檢索）
+├── backend/
+│   ├── models.py             # SQLAlchemy 資料表定義
+│   ├── crud.py               # 資料 CRUD（含 Pinecone 雙寫串接）
+│   └── database.py           # 資料庫連線配置
+└── scripts/
+    └── reconcile_sync.py     # 歷史資料對帳腳本（首次部署用）
 ```
 
 ---
@@ -94,11 +106,13 @@ ScreenScanner (QThread, 每 2 秒)
    │
    ├── 首次截圖
    │     ├── extract_all_messages()  → MemoryManager.add_messages()
-   │     └── analyze_chat_image(context)
+   │     ├── search_long_term_context()  → Pinecone 長期記憶
+   │     └── analyze_chat_image(context, long_term_context)
    │
    └── 後續截圖（畫面變動率 > 0.5%）
          ├── extract_latest_message() → MemoryManager.add_latest()（去重）
-         └── analyze_chat_image(context)
+         ├── search_long_term_context()  → Pinecone 長期記憶
+         └── analyze_chat_image(context, long_term_context)
                         │
                GeminiProvider (gemini-flash-latest, JPEG 1024px)
                         │
@@ -133,16 +147,23 @@ ScreenScanner (QThread, 每 2 秒)
 ```env
 # .env
 GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=your_postgresql_url
+PINECONE_API_KEY=your_pinecone_api_key_here
+PINECONE_INDEX=chatstar
 ```
 
-可在 `core/ai_provider.py` 調整：
+可在 AI 提供者核心模組調整：
 - `MAX_EDGE = 1024` — 圖片長邊上限（px）
 - `JPEG_QUALITY = 85` — JPEG 品質
 - `model = "gemini-flash-latest"` — Gemini 模型
 
-可在 `main.py` 調整：
+可在應用程式入口調整：
 - `MemoryManager(max_window=8)` — 對話記憶視窗大小（則數）
 - `ScreenScanner(interval=2.0)` — 截圖間隔（秒）
+
+Pinecone 搜尋可在語意搜尋模組調整：
+- `top_k=5` — 每次長期記憶最多取回筆數
+- 相似度門櫛：`score > 0.5`（cosine）
 
 ---
 

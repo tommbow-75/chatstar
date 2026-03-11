@@ -34,8 +34,10 @@ chatstar/
 ├── backend/               # FastAPI 後端服務
 │   ├── models.py          # SQLAlchemy 資料表定義 (User, ChatLog, etc.)
 │   ├── crud.py            # 資料增刪查改邏輯
-│   └── database.py        # 資料庫連線配置
-└── pinecone/              # 向量資料庫處理
+│   ├── database.py        # 資料庫連線配置
+└── vector_db/             # 向量資料庫（Pinecone）處理模組
+    ├── sync_service.py    # PostgreSQL -> Pinecone 非同步寫入
+    └── search_service.py  # Pinecone RAG 長期記憶檢索
 ```
 
 ## 3. 開發規範與慣例
@@ -73,7 +75,7 @@ uv run main.py
 1. **選取區域**：`SelectionWindow` 獲取座標。
 2. **啟動掃描**：`ScreenScanner` 每 2 秒截圖一次。
 3. **工作記憶**：`MemoryManager` 接收提取出的文字，維護 `max_window=8` 的對話視窗。
-4. **AI 分析**：`GeminiProvider` 結合圖片與記憶 context，產出 JSON 格式建議。
+4. **AI 分析**：`GeminiProvider` 結合圖片、短期記憶 Context 與 Pinecone 長期記憶，產出 JSON 格式建議。
 5. **更新 UI**：透過信號將回覆內容傳遞至 `MainWindow` 顯示。
 
 ---
